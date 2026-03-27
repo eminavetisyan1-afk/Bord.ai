@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.agents.config import AGENTS, PANEL_PRESETS
+from backend.database import init_db, close_db
 from backend.sessions import list_sessions, get_session, delete_session
 from backend.projects import (
     create_project, list_projects, get_project,
@@ -21,7 +23,15 @@ from backend.projects import (
 from backend.graph.runner import run_board
 from backend.config import APP_PASSWORD
 
-app = FastAPI(title="Virtual AI Board", version="2.2")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+    await close_db()
+
+
+app = FastAPI(title="Virtual AI Board", version="2.3", lifespan=lifespan)
 
 # ── Uploads directory ─────────────────────────────────────────────────────
 
@@ -133,17 +143,17 @@ async def get_presets():
 
 @app.get("/projects")
 async def projects_list():
-    return list_projects()
+    return await list_projects()
 
 
 @app.post("/projects")
 async def project_create(req: ProjectCreate):
-    return create_project(req.name, req.brief)
+    return await create_project(req.name, req.brief)
 
 
 @app.get("/projects/{project_id}")
 async def project_detail(project_id: str):
-    p = get_project(project_id)
+    p = await get_project(project_id)
     if not p:
         raise HTTPException(404, "Проект не найден")
     return p
@@ -151,7 +161,7 @@ async def project_detail(project_id: str):
 
 @app.put("/projects/{project_id}")
 async def project_update(project_id: str, req: ProjectUpdate):
-    p = update_project(project_id, req.name, req.brief)
+    p = await update_project(project_id, req.name, req.brief)
     if not p:
         raise HTTPException(404, "Проект не найден")
     return p
@@ -159,7 +169,7 @@ async def project_update(project_id: str, req: ProjectUpdate):
 
 @app.delete("/projects/{project_id}")
 async def project_delete(project_id: str):
-    if delete_project(project_id):
+    if await delete_project(project_id):
         return {"status": "deleted"}
     raise HTTPException(404, "Проект не найден")
 
@@ -168,12 +178,12 @@ async def project_delete(project_id: str):
 
 @app.get("/sessions")
 async def sessions_list(project_id: Optional[str] = Query(default=None)):
-    return list_sessions(20, project_id=project_id)
+    return await list_sessions(20, project_id=project_id)
 
 
 @app.get("/sessions/{session_id}")
 async def session_detail(session_id: str):
-    s = get_session(session_id)
+    s = await get_session(session_id)
     if not s:
         raise HTTPException(404, "Сессия не найдена")
     return s
@@ -181,7 +191,7 @@ async def session_detail(session_id: str):
 
 @app.delete("/sessions/{session_id}")
 async def session_delete(session_id: str):
-    if delete_session(session_id):
+    if await delete_session(session_id):
         return {"status": "deleted"}
     raise HTTPException(404, "Сессия не найдена")
 

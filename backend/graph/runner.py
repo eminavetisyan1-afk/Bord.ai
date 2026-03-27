@@ -124,7 +124,7 @@ async def run_solo(state: BoardState) -> None:
         "responses": {agent_id: {"round1": text}},
         "synthesis": "",
     }
-    save_session(session)
+    await save_session(session)
 
     await _push(queue, {
         "type": "done",
@@ -278,7 +278,7 @@ async def run_orchestrator(state: BoardState) -> None:
         "responses": responses,
         "synthesis": synthesis,
     }
-    save_session(session)
+    await save_session(session)
 
     await _push(queue, {
         "type": "done",
@@ -357,11 +357,11 @@ async def run_board(question: str, mode: str, agents: list[str], project_id: str
     # Load project brief if project selected
     project_brief = ""
     if project_id:
-        project = get_project(project_id)
+        project = await get_project(project_id)
         if project:
             project_brief = project.get("brief", "")
 
-    context_memory = get_recent_context(3, project_id=project_id or None)
+    context_memory = await get_recent_context(3, project_id=project_id or None)
 
     state: BoardState = {
         "question": question,
