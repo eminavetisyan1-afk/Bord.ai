@@ -4,7 +4,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-SESSIONS_FILE = Path(__file__).parent.parent / "sessions.json"
+from backend.config import DATA_DIR
+
+SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 
 def _load() -> list[dict]:

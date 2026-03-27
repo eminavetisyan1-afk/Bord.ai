@@ -5,7 +5,9 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-PROJECTS_FILE = Path(__file__).parent.parent / "projects.json"
+from backend.config import DATA_DIR
+
+PROJECTS_FILE = DATA_DIR / "projects.json"
 
 
 def _load() -> list[dict]:
