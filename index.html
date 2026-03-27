@@ -361,6 +361,57 @@ body {
 .pm-delete { background: none; border: 1px solid var(--danger); color: var(--danger); }
 .pm-delete:hover { background: rgba(239,68,68,.1); }
 
+/* ── Login screen ── */
+.login-screen {
+  display:flex; align-items:center; justify-content:center; min-height:100vh;
+  background:var(--bg); position:fixed; inset:0; z-index:999;
+}
+.login-box {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:40px; width:360px; max-width:90vw; text-align:center;
+}
+.login-box .logo-big {
+  font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:700;
+  color:var(--accent); margin-bottom:8px;
+}
+.login-box .subtitle { font-size:13px; color:var(--text-dim); margin-bottom:28px; }
+.login-box input {
+  width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
+  padding:12px 16px; border-radius:8px; font-family:'Inter',sans-serif; font-size:15px;
+  outline:none; margin-bottom:16px; text-align:center;
+}
+.login-box input:focus { border-color:var(--accent); }
+.login-box .login-btn {
+  width:100%; background:var(--accent); color:#0a0a0f; border:none; padding:12px;
+  border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:14px;
+  font-weight:700; cursor:pointer; transition:all .2s;
+}
+.login-box .login-btn:hover { opacity:.9; }
+.login-box .login-error { color:var(--danger); font-size:13px; margin-top:12px; display:none; }
+
+/* ── File attach ── */
+.file-attach-area {
+  display:flex; flex-wrap:wrap; gap:6px; padding:4px 16px 8px; align-items:center;
+}
+.file-chip {
+  display:inline-flex; align-items:center; gap:4px; background:var(--surface-2);
+  border:1px solid var(--border); border-radius:6px; padding:3px 8px;
+  font-size:11px; color:var(--text-dim); max-width:200px;
+}
+.file-chip .fname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.file-chip .remove {
+  background:none; border:none; color:var(--text-dim); cursor:pointer;
+  font-size:14px; line-height:1; padding:0 2px;
+}
+.file-chip .remove:hover { color:var(--danger); }
+.attach-btn {
+  display:inline-flex; align-items:center; gap:4px; background:none;
+  border:1px dashed var(--border); border-radius:6px; padding:3px 10px;
+  font-size:11px; color:var(--text-dim); cursor:pointer; font-family:'Inter',sans-serif;
+  transition:all .2s;
+}
+.attach-btn:hover { border-color:var(--accent); color:var(--accent); }
+
 .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
 .empty-state .icon { font-size:48px; margin-bottom:16px; display:block; }
 .empty-state p { font-size:14px; }
@@ -377,19 +428,31 @@ body {
 </head>
 <body>
 
+<!-- Login -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="logo-big">⬡ ВИРТУАЛЬНЫЙ БОРД</div>
+    <div class="subtitle">Введите пароль для доступа</div>
+    <input type="password" id="login-password" placeholder="Пароль" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">ВОЙТИ</button>
+    <div class="login-error" id="login-error">Неверный пароль</div>
+  </div>
+</div>
+
 <!-- Header -->
-<div class="header">
+<div class="header" id="main-app" style="display:none">
   <div class="header-left">
     <div class="logo" onclick="location.reload()">⬡ <span>ВИРТУАЛЬНЫЙ БОРД</span></div>
   </div>
   <div class="header-right">
     <button class="header-btn" onclick="openProjectManager()">Проекты</button>
     <button class="header-btn" onclick="toggleSidebar()">История</button>
+    <button class="header-btn" onclick="logout()" style="opacity:.6">Выйти</button>
   </div>
 </div>
 
 <!-- Project bar -->
-<div class="project-bar">
+<div class="project-bar" id="project-bar" style="display:none">
   <span class="label">Проект:</span>
   <select id="project-select" onchange="onProjectChange()">
     <option value="">— Без проекта —</option>
@@ -400,7 +463,7 @@ body {
 </div>
 
 <!-- Main -->
-<div class="container">
+<div class="container" id="main-container" style="display:none">
 
   <div class="section-title">Режим</div>
   <div class="modes" id="modes"></div>
@@ -419,6 +482,10 @@ body {
     <div class="section-title">Вопрос</div>
     <div class="question-wrap">
       <textarea id="question" placeholder="Задай вопрос своему борду..." maxlength="2000" rows="3"></textarea>
+      <div class="file-attach-area" id="question-files">
+        <button class="attach-btn" onclick="document.getElementById('question-file-input').click()">+ Файл</button>
+        <input type="file" id="question-file-input" style="display:none" multiple onchange="attachFiles(event,'question')">
+      </div>
       <div class="question-footer">
         <span class="char-count"><span id="char-count">0</span> / 2000</span>
         <button class="btn-submit" id="btn-submit" onclick="submitBoard()">СОЗВАТЬ БОРД →</button>
@@ -467,6 +534,8 @@ let presets = {};
 let projects = [];
 let currentProjectId = '';
 let isRunning = false;
+let authToken = localStorage.getItem('vb_token') || '';
+let questionAttachments = []; // [{filename, text}]
 
 const MODES = [
   { id:'solo', label:'Соло', desc:'Вопрос одному члену борда' },
@@ -488,8 +557,56 @@ const MODE_LABELS = {
   devils_advocate:'Адвокат дьявола', premortem:'Пре-мортем', quarterly:'Квартальный ревью',
 };
 
+// ── Auth ──
+async function doLogin() {
+  const pw = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  try {
+    const res = await fetch('/auth', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password: pw}),
+    });
+    if (!res.ok) { errEl.style.display='block'; return; }
+    const data = await res.json();
+    authToken = data.token;
+    localStorage.setItem('vb_token', authToken);
+    showApp();
+  } catch { errEl.style.display='block'; }
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = '';
+  document.getElementById('project-bar').style.display = '';
+  document.getElementById('main-container').style.display = '';
+  initApp();
+}
+
+function logout() {
+  authToken = '';
+  localStorage.removeItem('vb_token');
+  location.reload();
+}
+
+async function checkAuth() {
+  if (!authToken) return false;
+  try {
+    const res = await fetch('/auth/check', { headers:{'Authorization':'Bearer '+authToken} });
+    return res.ok;
+  } catch { return false; }
+}
+
 // ── Init ──
 async function init() {
+  if (await checkAuth()) {
+    showApp();
+  } else {
+    document.getElementById('login-screen').style.display = '';
+    setTimeout(() => document.getElementById('login-password').focus(), 100);
+  }
+}
+
+async function initApp() {
   const [agentsRes, presetsRes] = await Promise.all([
     fetch('/agents').then(r => r.json()),
     fetch('/presets').then(r => r.json()),
@@ -547,6 +664,10 @@ function openNewProject() {
     <div class="pm-field">
       <label>БРИФ (необязательно)</label>
       <textarea id="pm-brief" placeholder="Опишите проект, его цели, контекст, ключевые метрики... Борд будет учитывать этот бриф при ответах."></textarea>
+      <div style="margin-top:6px;">
+        <button class="attach-btn" onclick="document.getElementById('brief-file-input').click()">+ Загрузить файл в бриф</button>
+        <input type="file" id="brief-file-input" style="display:none" multiple onchange="attachFiles(event,'brief')">
+      </div>
     </div>
     <div class="pm-actions">
       <button class="pm-cancel" onclick="document.getElementById('project-modal-overlay').classList.remove('open')">Отмена</button>
@@ -587,6 +708,10 @@ function openBriefEditor() {
     <div class="pm-field">
       <label>БРИФ</label>
       <textarea id="pm-brief" placeholder="Опишите проект, его цели, контекст, ключевые метрики...">${escapeHtml(project.brief || '')}</textarea>
+      <div style="margin-top:6px;">
+        <button class="attach-btn" onclick="document.getElementById('brief-file-input-edit').click()">+ Загрузить файл в бриф</button>
+        <input type="file" id="brief-file-input-edit" style="display:none" multiple onchange="attachFiles(event,'brief')">
+      </div>
     </div>
     <div class="pm-actions">
       <button class="pm-delete" onclick="deleteCurrentProject()">Удалить проект</button>
@@ -714,8 +839,16 @@ function setupTextarea() {
 // ── Submit ──
 async function submitBoard() {
   if (isRunning) return;
-  const question = document.getElementById('question').value.trim();
+  let question = document.getElementById('question').value.trim();
   if (!question) return;
+
+  // Append file contents to question
+  if (questionAttachments.length) {
+    question += '\n\n═══ ПРИЛОЖЕННЫЕ ФАЙЛЫ ═══';
+    questionAttachments.forEach(f => {
+      question += `\n── ${f.filename} ──\n${f.text}\n`;
+    });
+  }
 
   const agentsList = (selectedMode === 'fullboard' || selectedMode === 'quarterly')
     ? agents.map(a => a.id) : [...selectedAgents];
@@ -934,6 +1067,54 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ── File attachments ──
+async function attachFiles(event, target) {
+  const files = event.target.files;
+  if (!files.length) return;
+
+  for (const file of files) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/upload', {
+        method: 'POST',
+        headers: {'Authorization': 'Bearer ' + authToken},
+        body: formData,
+      });
+      if (!res.ok) { alert('Ошибка загрузки: ' + file.name); continue; }
+      const data = await res.json();
+
+      if (target === 'question') {
+        questionAttachments.push({filename: data.filename, text: data.text});
+        renderQuestionFiles();
+      } else if (target === 'brief') {
+        const ta = document.getElementById('pm-brief');
+        if (ta) {
+          const prefix = ta.value ? '\n\n' : '';
+          ta.value += prefix + `── Файл: ${data.filename} ──\n${data.text}`;
+        }
+      }
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  }
+  event.target.value = '';
+}
+
+function renderQuestionFiles() {
+  const area = document.getElementById('question-files');
+  let html = '';
+  questionAttachments.forEach((f, i) => {
+    html += `<span class="file-chip"><span class="fname">${escapeHtml(f.filename)}</span><button class="remove" onclick="removeQuestionFile(${i})">×</button></span>`;
+  });
+  html += `<button class="attach-btn" onclick="document.getElementById('question-file-input').click()">+ Файл</button>`;
+  html += `<input type="file" id="question-file-input" style="display:none" multiple onchange="attachFiles(event,'question')">`;
+  area.innerHTML = html;
+}
+
+function removeQuestionFile(idx) {
+  questionAttachments.splice(idx, 1);
+  renderQuestionFiles();
 }
 
 init();

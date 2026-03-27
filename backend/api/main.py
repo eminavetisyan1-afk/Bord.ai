@@ -1,12 +1,15 @@
 import asyncio
+import hashlib
 import json
+import os
 import time
+import uuid
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.agents.config import AGENTS, PANEL_PRESETS
@@ -16,8 +19,22 @@ from backend.projects import (
     update_project, delete_project,
 )
 from backend.graph.runner import run_board
+from backend.config import APP_PASSWORD
 
-app = FastAPI(title="Virtual AI Board", version="2.1")
+app = FastAPI(title="Virtual AI Board", version="2.2")
+
+# ── Uploads directory ─────────────────────────────────────────────────────
+
+UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
+
+ALLOWED_EXTENSIONS = {
+    ".txt", ".md", ".csv", ".json", ".xml", ".yaml", ".yml",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+    ".py", ".js", ".ts", ".html", ".css",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 # ── Rate limiting (simple in-memory) ──────────────────────────────────────
 
@@ -53,6 +70,34 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=200)
     brief: Optional[str] = Field(default=None, max_length=10000)
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────
+
+@app.post("/auth")
+async def auth(request: Request):
+    body = await request.json()
+    password = body.get("password", "")
+    if password == APP_PASSWORD:
+        token = hashlib.sha256(f"{APP_PASSWORD}:{int(time.time()//86400)}".encode()).hexdigest()
+        return {"token": token}
+    raise HTTPException(401, "Неверный пароль")
+
+
+@app.get("/auth/check")
+async def auth_check(request: Request):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    expected = hashlib.sha256(f"{APP_PASSWORD}:{int(time.time()//86400)}".encode()).hexdigest()
+    if token == expected:
+        return {"valid": True}
+    raise HTTPException(401, "Требуется авторизация")
+
+
+def _verify_token(request: Request):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    expected = hashlib.sha256(f"{APP_PASSWORD}:{int(time.time()//86400)}".encode()).hexdigest()
+    if token != expected:
+        raise HTTPException(401, "Требуется авторизация")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────
@@ -144,6 +189,50 @@ async def session_delete(session_id: str):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# ── File upload ───────────────────────────────────────────────────────────
+
+@app.post("/upload")
+async def upload_file(request: Request, file: UploadFile = File(...)):
+    _verify_token(request)
+
+    if not file.filename:
+        raise HTTPException(400, "Нет файла")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"Тип файла {ext} не поддерживается")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(400, "Файл слишком большой (макс. 10MB)")
+
+    # Extract text content from file
+    text_content = ""
+    if ext in {".txt", ".md", ".csv", ".json", ".xml", ".yaml", ".yml",
+               ".py", ".js", ".ts", ".html", ".css"}:
+        try:
+            text_content = content.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                text_content = content.decode("latin-1")
+            except Exception:
+                text_content = "[Не удалось прочитать файл]"
+    elif ext in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+        text_content = f"[Изображение: {file.filename}]"
+    else:
+        text_content = f"[Файл: {file.filename}, {len(content)} байт]"
+
+    # Truncate very long files
+    if len(text_content) > 50000:
+        text_content = text_content[:50000] + f"\n\n[...обрезано, всего {len(text_content)} символов]"
+
+    return {
+        "filename": file.filename,
+        "size": len(content),
+        "text": text_content,
+    }
 
 
 # ── Board ─────────────────────────────────────────────────────────────────
