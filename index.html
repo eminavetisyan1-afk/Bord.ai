@@ -481,13 +481,13 @@ body {
   <div class="question-section">
     <div class="section-title">Вопрос</div>
     <div class="question-wrap">
-      <textarea id="question" placeholder="Задай вопрос своему борду..." maxlength="2000" rows="3"></textarea>
+      <textarea id="question" placeholder="Задай вопрос своему борду..." maxlength="10000" rows="3"></textarea>
       <div class="file-attach-area" id="question-files">
         <button class="attach-btn" onclick="document.getElementById('question-file-input').click()">+ Файл</button>
         <input type="file" id="question-file-input" style="display:none" multiple onchange="attachFiles(event,'question')">
       </div>
       <div class="question-footer">
-        <span class="char-count"><span id="char-count">0</span> / 2000</span>
+        <span class="char-count"><span id="char-count">0</span> / 10 000</span>
         <button class="btn-submit" id="btn-submit" onclick="submitBoard()">СОЗВАТЬ БОРД →</button>
       </div>
     </div>
@@ -663,10 +663,13 @@ function openNewProject() {
     </div>
     <div class="pm-field">
       <label>БРИФ (необязательно)</label>
-      <textarea id="pm-brief" placeholder="Опишите проект, его цели, контекст, ключевые метрики... Борд будет учитывать этот бриф при ответах."></textarea>
-      <div style="margin-top:6px;">
-        <button class="attach-btn" onclick="document.getElementById('brief-file-input').click()">+ Загрузить файл в бриф</button>
-        <input type="file" id="brief-file-input" style="display:none" multiple onchange="attachFiles(event,'brief')">
+      <textarea id="pm-brief" placeholder="Опишите проект, его цели, контекст, ключевые метрики... Борд будет учитывать этот бриф при ответах." maxlength="50000" oninput="updateBriefCounter()"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+        <div>
+          <button class="attach-btn" onclick="document.getElementById('brief-file-input').click()">+ Загрузить файл в бриф</button>
+          <input type="file" id="brief-file-input" style="display:none" multiple onchange="attachFiles(event,'brief')">
+        </div>
+        <span class="char-count"><span id="brief-char-count">0</span> / 50 000</span>
       </div>
     </div>
     <div class="pm-actions">
@@ -707,10 +710,13 @@ function openBriefEditor() {
     </div>
     <div class="pm-field">
       <label>БРИФ</label>
-      <textarea id="pm-brief" placeholder="Опишите проект, его цели, контекст, ключевые метрики...">${escapeHtml(project.brief || '')}</textarea>
-      <div style="margin-top:6px;">
-        <button class="attach-btn" onclick="document.getElementById('brief-file-input-edit').click()">+ Загрузить файл в бриф</button>
-        <input type="file" id="brief-file-input-edit" style="display:none" multiple onchange="attachFiles(event,'brief')">
+      <textarea id="pm-brief" placeholder="Опишите проект, его цели, контекст, ключевые метрики..." maxlength="50000" oninput="updateBriefCounter()">${escapeHtml(project.brief || '')}</textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+        <div>
+          <button class="attach-btn" onclick="document.getElementById('brief-file-input-edit').click()">+ Загрузить файл в бриф</button>
+          <input type="file" id="brief-file-input-edit" style="display:none" multiple onchange="attachFiles(event,'brief')">
+        </div>
+        <span class="char-count"><span id="brief-char-count">${(project.brief || '').length.toLocaleString('ru-RU')}</span> / 50 000</span>
       </div>
     </div>
     <div class="pm-actions">
@@ -830,10 +836,25 @@ function toggleAgent(id) { selectedAgents.has(id)?selectedAgents.delete(id):sele
 function selectAllAgents() { agents.forEach(a=>selectedAgents.add(a.id)); renderAgents(); }
 function clearAgents() { selectedAgents.clear(); renderAgents(); }
 
+// ── Brief counter ──
+function updateBriefCounter() {
+  const ta = document.getElementById('pm-brief');
+  const el = document.getElementById('brief-char-count');
+  if (!ta || !el) return;
+  const len = ta.value.length;
+  el.textContent = len.toLocaleString('ru-RU');
+  el.style.color = len > 45000 ? '#ff4444' : len > 35000 ? '#ffaa00' : '';
+}
+
 // ── Textarea ──
 function setupTextarea() {
   const ta = document.getElementById('question');
-  ta.addEventListener('input', () => { document.getElementById('char-count').textContent = ta.value.length; });
+  ta.addEventListener('input', () => {
+    const len = ta.value.length;
+    const el = document.getElementById('char-count');
+    el.textContent = len.toLocaleString('ru-RU');
+    el.style.color = len > 9000 ? '#ff4444' : len > 7000 ? '#ffaa00' : '';
+  });
 }
 
 // ── Submit ──

@@ -56,7 +56,7 @@ def _check_rate_limit(client_ip: str) -> bool:
 # ── Models ────────────────────────────────────────────────────────────────
 
 class BoardRequest(BaseModel):
-    question: str = Field(..., max_length=2000)
+    question: str = Field(..., max_length=10000)
     mode: str = Field(..., pattern="^(solo|panel|fullboard|devils_advocate|premortem|quarterly)$")
     agents: list[str] = Field(default_factory=list)
     project_id: str = Field(default="")
@@ -64,12 +64,12 @@ class BoardRequest(BaseModel):
 
 class ProjectCreate(BaseModel):
     name: str = Field(..., max_length=200)
-    brief: str = Field(default="", max_length=10000)
+    brief: str = Field(default="", max_length=50000)
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=200)
-    brief: Optional[str] = Field(default=None, max_length=10000)
+    brief: Optional[str] = Field(default=None, max_length=50000)
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────
