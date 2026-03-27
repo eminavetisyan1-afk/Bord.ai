@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncpg
-import json
 import os
-from backend.config import DATA_DIR
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
