@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 SESSIONS_FILE = Path(__file__).parent.parent / "sessions.json"
 
@@ -33,8 +31,10 @@ def save_session(session: dict) -> None:
     _save(sessions)
 
 
-def list_sessions(n: int = 20) -> list[dict]:
+def list_sessions(n: int = 20, project_id: str | None = None) -> list[dict]:
     sessions = _load()
+    if project_id is not None:
+        sessions = [s for s in sessions if s.get("project_id") == project_id]
     result = []
     for s in sessions[:n]:
         result.append({
@@ -43,6 +43,7 @@ def list_sessions(n: int = 20) -> list[dict]:
             "mode": s["mode"],
             "question": s["question"][:120],
             "agents": s.get("agents", []),
+            "project_id": s.get("project_id"),
         })
     return result
 
@@ -64,9 +65,12 @@ def delete_session(session_id: str) -> bool:
     return False
 
 
-def get_recent_context(n: int = 3) -> str:
+def get_recent_context(n: int = 3, project_id: str | None = None) -> str:
     """Return last n sessions as context string for agent memory."""
-    sessions = _load()[:n]
+    sessions = _load()
+    if project_id:
+        sessions = [s for s in sessions if s.get("project_id") == project_id]
+    sessions = sessions[:n]
     if not sessions:
         return ""
     parts = []

@@ -3,16 +3,21 @@ import json
 import time
 from collections import defaultdict
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.agents.config import AGENTS, PANEL_PRESETS
 from backend.sessions import list_sessions, get_session, delete_session
+from backend.projects import (
+    create_project, list_projects, get_project,
+    update_project, delete_project,
+)
 from backend.graph.runner import run_board
 
-app = FastAPI(title="Virtual AI Board", version="2.0")
+app = FastAPI(title="Virtual AI Board", version="2.1")
 
 # ── Rate limiting (simple in-memory) ──────────────────────────────────────
 
@@ -37,6 +42,17 @@ class BoardRequest(BaseModel):
     question: str = Field(..., max_length=2000)
     mode: str = Field(..., pattern="^(solo|panel|fullboard|devils_advocate|premortem|quarterly)$")
     agents: list[str] = Field(default_factory=list)
+    project_id: str = Field(default="")
+
+
+class ProjectCreate(BaseModel):
+    name: str = Field(..., max_length=200)
+    brief: str = Field(default="", max_length=10000)
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=200)
+    brief: Optional[str] = Field(default=None, max_length=10000)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────
@@ -48,7 +64,7 @@ async def index():
 
 
 @app.get("/agents")
-async def get_agents():
+async def get_agents_list():
     result = []
     for aid, cfg in AGENTS.items():
         result.append({
@@ -68,9 +84,46 @@ async def get_presets():
     return PANEL_PRESETS
 
 
+# ── Projects ──────────────────────────────────────────────────────────────
+
+@app.get("/projects")
+async def projects_list():
+    return list_projects()
+
+
+@app.post("/projects")
+async def project_create(req: ProjectCreate):
+    return create_project(req.name, req.brief)
+
+
+@app.get("/projects/{project_id}")
+async def project_detail(project_id: str):
+    p = get_project(project_id)
+    if not p:
+        raise HTTPException(404, "Проект не найден")
+    return p
+
+
+@app.put("/projects/{project_id}")
+async def project_update(project_id: str, req: ProjectUpdate):
+    p = update_project(project_id, req.name, req.brief)
+    if not p:
+        raise HTTPException(404, "Проект не найден")
+    return p
+
+
+@app.delete("/projects/{project_id}")
+async def project_delete(project_id: str):
+    if delete_project(project_id):
+        return {"status": "deleted"}
+    raise HTTPException(404, "Проект не найден")
+
+
+# ── Sessions ──────────────────────────────────────────────────────────────
+
 @app.get("/sessions")
-async def sessions_list():
-    return list_sessions(20)
+async def sessions_list(project_id: Optional[str] = Query(default=None)):
+    return list_sessions(20, project_id=project_id)
 
 
 @app.get("/sessions/{session_id}")
@@ -93,6 +146,8 @@ async def health():
     return {"status": "ok"}
 
 
+# ── Board ─────────────────────────────────────────────────────────────────
+
 @app.post("/board")
 async def board_endpoint(req: BoardRequest, request: Request):
     client_ip = request.client.host if request.client else "unknown"
@@ -113,7 +168,7 @@ async def board_endpoint(req: BoardRequest, request: Request):
         if not valid_agents:
             raise HTTPException(400, "Выберите хотя бы одного агента.")
 
-    queue = await run_board(req.question, req.mode, valid_agents)
+    queue = await run_board(req.question, req.mode, valid_agents, project_id=req.project_id)
 
     async def event_stream():
         while True:
@@ -125,8 +180,6 @@ async def board_endpoint(req: BoardRequest, request: Request):
 
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
-            if event.get("type") in ("done", "error" if not event.get("type") == "error" else None):
-                pass
             if event.get("type") == "done":
                 break
 

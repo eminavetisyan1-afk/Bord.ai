@@ -15,6 +15,7 @@ from backend.agents.config import (
 from backend.agents.prompts import AGENT_PROMPTS, ORCHESTRATOR_PROMPT
 from backend.graph.states import BoardState
 from backend.sessions import save_session, get_recent_context
+from backend.projects import get_project
 
 
 def _llm(model: str) -> ChatAnthropic:
@@ -86,9 +87,11 @@ async def _stream_agent(
     return full_text, usage_info
 
 
-def _build_system_prompt(agent_id: str, context_memory: str) -> str:
-    """Build full system prompt with context memory appended."""
+def _build_system_prompt(agent_id: str, context_memory: str, project_brief: str = "") -> str:
+    """Build full system prompt with project brief and context memory appended."""
     base = AGENT_PROMPTS.get(agent_id, "You are a helpful advisor.")
+    if project_brief:
+        base += f"\n\n═══ БРИФ ПРОЕКТА ═══\n{project_brief}\n\nУчитывай этот контекст проекта при формулировке ответа."
     if context_memory:
         base += f"\n\n═══ КОНТЕКСТ ПРЕДЫДУЩИХ СЕССИЙ ═══\n{context_memory}"
     return base
@@ -100,7 +103,7 @@ async def run_solo(state: BoardState) -> None:
     agent_id = state["agents"][0]
     agent_cfg = AGENTS[agent_id]
 
-    system_prompt = _build_system_prompt(agent_id, state["context_memory"])
+    system_prompt = _build_system_prompt(agent_id, state["context_memory"], state.get("project_brief", ""))
     model = HAIKU_MODEL  # Solo = fast & cheap
 
     text, usage = await _stream_agent(
@@ -117,6 +120,7 @@ async def run_solo(state: BoardState) -> None:
         "mode": "solo",
         "question": state["question"],
         "agents": state["agents"],
+        "project_id": state.get("project_id", ""),
         "responses": {agent_id: {"round1": text}},
         "synthesis": "",
     }
@@ -136,7 +140,7 @@ async def run_round1(state: BoardState) -> None:
 
     async def process_agent(agent_id: str):
         agent_cfg = AGENTS[agent_id]
-        system_prompt = _build_system_prompt(agent_id, state["context_memory"])
+        system_prompt = _build_system_prompt(agent_id, state["context_memory"], state.get("project_brief", ""))
         model = agent_cfg["model"]
 
         user_msg = state["question"]
@@ -174,7 +178,7 @@ async def run_round2(state: BoardState) -> None:
 
     async def process_agent(agent_id: str):
         agent_cfg = AGENTS[agent_id]
-        system_prompt = _build_system_prompt(agent_id, state["context_memory"])
+        system_prompt = _build_system_prompt(agent_id, state["context_memory"], state.get("project_brief", ""))
         model = agent_cfg["model"]
 
         my_round1 = state["round1_responses"].get(agent_id, "")
@@ -270,6 +274,7 @@ async def run_orchestrator(state: BoardState) -> None:
         "mode": state["mode"],
         "question": state["question"],
         "agents": state["agents"],
+        "project_id": state.get("project_id", ""),
         "responses": responses,
         "synthesis": synthesis,
     }
@@ -345,16 +350,25 @@ async def run_quarterly(state: BoardState) -> None:
     await run_orchestrator(state)
 
 
-async def run_board(question: str, mode: str, agents: list[str]) -> asyncio.Queue:
+async def run_board(question: str, mode: str, agents: list[str], project_id: str = "") -> asyncio.Queue:
     """Main entry point: creates state and runs the appropriate graph."""
     queue: asyncio.Queue = asyncio.Queue()
 
-    context_memory = get_recent_context(3)
+    # Load project brief if project selected
+    project_brief = ""
+    if project_id:
+        project = get_project(project_id)
+        if project:
+            project_brief = project.get("brief", "")
+
+    context_memory = get_recent_context(3, project_id=project_id or None)
 
     state: BoardState = {
         "question": question,
         "mode": mode,
         "agents": agents,
+        "project_id": project_id,
+        "project_brief": project_brief,
         "context_memory": context_memory,
         "round1_responses": {},
         "round2_responses": {},
