@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncpg
+import hashlib
 import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -16,9 +17,23 @@ async def get_pool() -> asyncpg.Pool:
 
 
 async def init_db():
-    """Create tables if they don't exist."""
+    """Создать таблицы и выполнить миграции."""
     pool = await get_pool()
     async with pool.acquire() as conn:
+        # Таблица пользователей
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                display_name TEXT NOT NULL DEFAULT '',
+                role TEXT NOT NULL DEFAULT 'user',
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # Таблица проектов
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS projects (
                 id TEXT PRIMARY KEY,
@@ -28,6 +43,8 @@ async def init_db():
                 updated_at TEXT NOT NULL
             )
         """)
+
+        # Таблица сессий
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
@@ -39,6 +56,45 @@ async def init_db():
                 data JSONB DEFAULT '{}'
             )
         """)
+
+        # Миграция: добавить user_id в projects и sessions (если ещё нет)
+        await conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'projects' AND column_name = 'user_id'
+                ) THEN
+                    ALTER TABLE projects ADD COLUMN user_id TEXT DEFAULT '';
+                END IF;
+            END $$;
+        """)
+
+        await conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'sessions' AND column_name = 'user_id'
+                ) THEN
+                    ALTER TABLE sessions ADD COLUMN user_id TEXT DEFAULT '';
+                END IF;
+            END $$;
+        """)
+
+        # Создать администратора по умолчанию (если ещё нет)
+        existing = await conn.fetchrow("SELECT id FROM users WHERE username = 'admin'")
+        if not existing:
+            from datetime import datetime
+            import uuid
+            admin_hash = hashlib.sha256("grachik".encode()).hexdigest()
+            await conn.execute(
+                """INSERT INTO users (id, username, password_hash, display_name, role, is_active, created_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                str(uuid.uuid4()), "admin", admin_hash,
+                "Администратор", "admin", True,
+                datetime.now().isoformat(timespec="seconds"),
+            )
 
 
 async def close_db():

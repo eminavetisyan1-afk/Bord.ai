@@ -389,6 +389,87 @@ body {
 .login-box .login-btn:hover { opacity:.9; }
 .login-box .login-error { color:var(--danger); font-size:13px; margin-top:12px; display:none; }
 
+/* ── User badge (header) ── */
+.user-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--text-dim); padding:6px 12px;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+}
+.user-badge .user-name { color:var(--text); font-weight:600; }
+.user-badge .user-role {
+  font-size:10px; padding:1px 6px; border-radius:4px;
+  background:var(--accent-glow); color:var(--accent); font-weight:600; text-transform:uppercase;
+}
+
+/* ── Admin panel modal ── */
+.admin-stats {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px;
+}
+.admin-stat {
+  background:var(--bg); border:1px solid var(--border); border-radius:10px;
+  padding:16px; text-align:center;
+}
+.admin-stat .value {
+  font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700;
+  color:var(--accent); display:block;
+}
+.admin-stat .label { font-size:11px; color:var(--text-dim); margin-top:4px; display:block; }
+
+.admin-table {
+  width:100%; border-collapse:collapse; font-size:13px;
+}
+.admin-table th {
+  text-align:left; padding:10px 12px; font-size:11px; font-weight:600;
+  color:var(--text-dim); border-bottom:1px solid var(--border);
+  font-family:'JetBrains Mono',monospace; letter-spacing:1px; text-transform:uppercase;
+}
+.admin-table td {
+  padding:10px 12px; border-bottom:1px solid rgba(42,42,58,.5); vertical-align:middle;
+}
+.admin-table tr:hover td { background:var(--bg); }
+.admin-table .badge-admin {
+  font-size:10px; padding:2px 8px; border-radius:4px;
+  background:rgba(167,139,250,.15); color:var(--violet); font-weight:600;
+}
+.admin-table .badge-user {
+  font-size:10px; padding:2px 8px; border-radius:4px;
+  background:var(--accent-glow); color:var(--accent); font-weight:600;
+}
+.admin-table .badge-inactive {
+  font-size:10px; padding:2px 8px; border-radius:4px;
+  background:rgba(239,68,68,.1); color:var(--danger); font-weight:600;
+}
+.admin-table .badge-active {
+  font-size:10px; padding:2px 8px; border-radius:4px;
+  background:rgba(52,211,153,.1); color:var(--success); font-weight:600;
+}
+.admin-btn-sm {
+  background:none; border:1px solid var(--border); color:var(--text-dim);
+  padding:4px 10px; border-radius:6px; cursor:pointer; font-size:11px;
+  font-family:'Inter',sans-serif; transition:all .2s; margin-right:4px;
+}
+.admin-btn-sm:hover { border-color:var(--accent); color:var(--text); }
+.admin-btn-sm.danger { border-color:var(--danger); color:var(--danger); }
+.admin-btn-sm.danger:hover { background:rgba(239,68,68,.1); }
+
+.admin-form { margin-top:20px; padding:20px; background:var(--bg); border:1px solid var(--border); border-radius:10px; }
+.admin-form .form-title {
+  font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600;
+  color:var(--accent); margin-bottom:16px;
+}
+.admin-form .form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.admin-form .form-row > * { flex:1; min-width:140px; }
+.admin-form input, .admin-form select {
+  width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+  padding:8px 12px; border-radius:6px; font-family:'Inter',sans-serif; font-size:13px; outline:none;
+}
+.admin-form input:focus, .admin-form select:focus { border-color:var(--accent); }
+.admin-form label {
+  display:block; font-size:11px; color:var(--text-dim); margin-bottom:4px;
+  font-family:'JetBrains Mono',monospace;
+}
+.admin-form .form-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+
 /* ── File attach ── */
 .file-attach-area {
   display:flex; flex-wrap:wrap; gap:6px; padding:4px 16px 8px; align-items:center;
@@ -432,10 +513,11 @@ body {
 <div class="login-screen" id="login-screen">
   <div class="login-box">
     <div class="logo-big">⬡ ВИРТУАЛЬНЫЙ БОРД</div>
-    <div class="subtitle">Введите пароль для доступа</div>
-    <input type="password" id="login-password" placeholder="Пароль" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="subtitle">Войдите в свой аккаунт</div>
+    <input type="text" id="login-username" placeholder="Логин" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+    <input type="password" id="login-password" placeholder="Пароль" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" onclick="doLogin()">ВОЙТИ</button>
-    <div class="login-error" id="login-error">Неверный пароль</div>
+    <div class="login-error" id="login-error">Неверный логин или пароль</div>
   </div>
 </div>
 
@@ -445,6 +527,11 @@ body {
     <div class="logo" onclick="location.reload()">⬡ <span>ВИРТУАЛЬНЫЙ БОРД</span></div>
   </div>
   <div class="header-right">
+    <span class="user-badge" id="user-badge">
+      <span class="user-name" id="header-user-name"></span>
+      <span class="user-role" id="header-user-role"></span>
+    </span>
+    <button class="header-btn" id="btn-admin" style="display:none" onclick="openAdminPanel()">Админка</button>
     <button class="header-btn" onclick="openProjectManager()">Проекты</button>
     <button class="header-btn" onclick="toggleSidebar()">История</button>
     <button class="header-btn" onclick="logout()" style="opacity:.6">Выйти</button>
@@ -525,6 +612,14 @@ body {
   </div>
 </div>
 
+<!-- Admin modal -->
+<div class="modal-overlay" id="admin-modal-overlay" onclick="closeAdminModal(event)">
+  <div class="modal" id="admin-modal" style="max-width:900px;">
+    <button class="modal-close" onclick="document.getElementById('admin-modal-overlay').classList.remove('open')">×</button>
+    <div id="admin-modal-body"></div>
+  </div>
+</div>
+
 <script>
 // ── State ──
 let agents = [];
@@ -535,6 +630,7 @@ let projects = [];
 let currentProjectId = '';
 let isRunning = false;
 let authToken = localStorage.getItem('vb_token') || '';
+let currentUser = JSON.parse(localStorage.getItem('vb_user') || 'null');
 let questionAttachments = []; // [{filename, text}]
 
 const MODES = [
@@ -557,21 +653,38 @@ const MODE_LABELS = {
   devils_advocate:'Адвокат дьявола', premortem:'Пре-мортем', quarterly:'Квартальный ревью',
 };
 
+// ── Хелпер для авторизованных запросов ──
+function authHeaders(extra = {}) {
+  return { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json', ...extra };
+}
+
 // ── Auth ──
 async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
   const pw = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  if (!username || !pw) { errEl.textContent = 'Введите логин и пароль'; errEl.style.display = 'block'; return; }
+
   try {
     const res = await fetch('/auth', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({password: pw}),
+      body: JSON.stringify({ username, password: pw }),
     });
-    if (!res.ok) { errEl.style.display='block'; return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      errEl.textContent = err.detail || 'Неверный логин или пароль';
+      errEl.style.display = 'block';
+      return;
+    }
     const data = await res.json();
     authToken = data.token;
+    currentUser = data.user;
     localStorage.setItem('vb_token', authToken);
+    localStorage.setItem('vb_user', JSON.stringify(currentUser));
     showApp();
-  } catch { errEl.style.display='block'; }
+  } catch { errEl.textContent = 'Ошибка соединения'; errEl.style.display = 'block'; }
 }
 
 function showApp() {
@@ -579,12 +692,23 @@ function showApp() {
   document.getElementById('main-app').style.display = '';
   document.getElementById('project-bar').style.display = '';
   document.getElementById('main-container').style.display = '';
+  updateUserBadge();
   initApp();
+}
+
+function updateUserBadge() {
+  if (!currentUser) return;
+  document.getElementById('header-user-name').textContent = currentUser.display_name || currentUser.username;
+  document.getElementById('header-user-role').textContent = currentUser.role === 'admin' ? 'ADMIN' : 'USER';
+  // Показать кнопку админки если админ
+  document.getElementById('btn-admin').style.display = currentUser.role === 'admin' ? '' : 'none';
 }
 
 function logout() {
   authToken = '';
+  currentUser = null;
   localStorage.removeItem('vb_token');
+  localStorage.removeItem('vb_user');
   location.reload();
 }
 
@@ -592,7 +716,13 @@ async function checkAuth() {
   if (!authToken) return false;
   try {
     const res = await fetch('/auth/check', { headers:{'Authorization':'Bearer '+authToken} });
-    return res.ok;
+    if (res.ok) {
+      const data = await res.json();
+      currentUser = data.user;
+      localStorage.setItem('vb_user', JSON.stringify(currentUser));
+      return true;
+    }
+    return false;
   } catch { return false; }
 }
 
@@ -602,7 +732,7 @@ async function init() {
     showApp();
   } else {
     document.getElementById('login-screen').style.display = '';
-    setTimeout(() => document.getElementById('login-password').focus(), 100);
+    setTimeout(() => document.getElementById('login-username').focus(), 100);
   }
 }
 
@@ -622,7 +752,7 @@ async function initApp() {
 
 // ── Projects ──
 async function loadProjects() {
-  projects = await fetch('/projects').then(r => r.json());
+  projects = await fetch('/projects', { headers: {'Authorization':'Bearer '+authToken} }).then(r => r.json());
   renderProjectSelect();
 }
 
@@ -687,7 +817,7 @@ async function saveNewProject() {
   const brief = document.getElementById('pm-brief').value.trim();
   const p = await fetch('/projects', {
     method: 'POST',
-    headers: {'Content-Type':'application/json'},
+    headers: authHeaders(),
     body: JSON.stringify({ name, brief }),
   }).then(r => r.json());
 
@@ -734,7 +864,7 @@ async function updateCurrentProject() {
   const brief = document.getElementById('pm-brief').value.trim();
   await fetch(`/projects/${currentProjectId}`, {
     method: 'PUT',
-    headers: {'Content-Type':'application/json'},
+    headers: authHeaders(),
     body: JSON.stringify({ name, brief }),
   });
   document.getElementById('project-modal-overlay').classList.remove('open');
@@ -743,7 +873,7 @@ async function updateCurrentProject() {
 
 async function deleteCurrentProject() {
   if (!confirm('Удалить проект? Сессии останутся в истории.')) return;
-  await fetch(`/projects/${currentProjectId}`, { method: 'DELETE' });
+  await fetch(`/projects/${currentProjectId}`, { method: 'DELETE', headers: {'Authorization':'Bearer '+authToken} });
   currentProjectId = '';
   document.getElementById('project-modal-overlay').classList.remove('open');
   await loadProjects();
@@ -894,7 +1024,7 @@ async function submitBoard() {
   try {
     const res = await fetch('/board', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: authHeaders(),
       body: JSON.stringify({
         question,
         mode: selectedMode,
@@ -1023,7 +1153,7 @@ async function loadSessions() {
   const list = document.getElementById('sessions-list');
   try {
     const url = currentProjectId ? `/sessions?project_id=${currentProjectId}` : '/sessions';
-    const sessions = await fetch(url).then(r => r.json());
+    const sessions = await fetch(url, { headers: {'Authorization':'Bearer '+authToken} }).then(r => r.json());
     if (!sessions.length) {
       const label = currentProjectId ? 'Нет сессий в этом проекте' : 'Нет сохранённых сессий';
       list.innerHTML = `<div class="empty-state"><span class="icon">📭</span><p>${label}</p></div>`;
@@ -1048,7 +1178,7 @@ async function loadSessions() {
 
 async function openSession(id) {
   try {
-    const s = await fetch(`/sessions/${id}`).then(r => r.json());
+    const s = await fetch(`/sessions/${id}`, { headers: {'Authorization':'Bearer '+authToken} }).then(r => r.json());
     const body = document.getElementById('modal-body');
     let content = `<h2>${escapeHtml(s.question)}</h2>`;
     content += `<div class="modal-meta">${new Date(s.ts).toLocaleString('ru-RU')} · ${MODE_LABELS[s.mode]||s.mode}</div>`;
@@ -1076,7 +1206,7 @@ async function openSession(id) {
 
 async function deleteSession(id) {
   if (!confirm('Удалить сессию?')) return;
-  try { await fetch(`/sessions/${id}`,{method:'DELETE'}); loadSessions(); } catch {}
+  try { await fetch(`/sessions/${id}`,{method:'DELETE', headers:{'Authorization':'Bearer '+authToken}}); loadSessions(); } catch {}
 }
 
 function closeModal(e) {
@@ -1136,6 +1266,209 @@ function renderQuestionFiles() {
 function removeQuestionFile(idx) {
   questionAttachments.splice(idx, 1);
   renderQuestionFiles();
+}
+
+// ── Admin Panel ──
+function closeAdminModal(e) {
+  if (e.target === document.getElementById('admin-modal-overlay'))
+    document.getElementById('admin-modal-overlay').classList.remove('open');
+}
+
+async function openAdminPanel() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  const body = document.getElementById('admin-modal-body');
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">Загрузка...</div>';
+  document.getElementById('admin-modal-overlay').classList.add('open');
+
+  try {
+    const [usersRes, statsRes] = await Promise.all([
+      fetch('/admin/users', { headers: {'Authorization':'Bearer '+authToken} }).then(r => r.json()),
+      fetch('/admin/stats', { headers: {'Authorization':'Bearer '+authToken} }).then(r => r.json()),
+    ]);
+    renderAdminPanel(usersRes, statsRes);
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--danger);padding:20px;">Ошибка загрузки данных</div>';
+  }
+}
+
+function renderAdminPanel(users, stats) {
+  const body = document.getElementById('admin-modal-body');
+  let html = '<h2>Панель администратора</h2>';
+
+  // Статистика
+  html += `
+    <div class="admin-stats">
+      <div class="admin-stat"><span class="value">${stats.users}</span><span class="label">Пользователей</span></div>
+      <div class="admin-stat"><span class="value">${stats.projects}</span><span class="label">Проектов</span></div>
+      <div class="admin-stat"><span class="value">${stats.sessions}</span><span class="label">Сессий</span></div>
+    </div>
+  `;
+
+  // Таблица пользователей
+  html += `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div class="section-title" style="margin:0;">Пользователи</div>
+      <button class="admin-btn-sm" onclick="showCreateUserForm()" style="border-color:var(--accent);color:var(--accent);">+ Создать пользователя</button>
+    </div>
+    <div id="admin-create-form-container"></div>
+    <table class="admin-table">
+      <thead>
+        <tr><th>Логин</th><th>Имя</th><th>Роль</th><th>Статус</th><th>Создан</th><th>Действия</th></tr>
+      </thead>
+      <tbody>
+  `;
+  users.forEach(u => {
+    const roleBadge = u.role === 'admin'
+      ? '<span class="badge-admin">admin</span>'
+      : '<span class="badge-user">user</span>';
+    const statusBadge = u.is_active
+      ? '<span class="badge-active">активен</span>'
+      : '<span class="badge-inactive">отключён</span>';
+    const created = new Date(u.created_at).toLocaleDateString('ru-RU');
+    const isSelf = u.id === currentUser.id;
+    html += `
+      <tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-weight:600;">${escapeHtml(u.username)}</td>
+        <td>${escapeHtml(u.display_name)}</td>
+        <td>${roleBadge}</td>
+        <td>${statusBadge}</td>
+        <td style="font-size:12px;color:var(--text-dim);">${created}</td>
+        <td>
+          <button class="admin-btn-sm" onclick="showEditUserForm('${u.id}')">Изменить</button>
+          ${isSelf ? '' : `<button class="admin-btn-sm danger" onclick="adminDeleteUser('${u.id}','${escapeHtml(u.username)}')">Удалить</button>`}
+        </td>
+      </tr>
+    `;
+  });
+  html += '</tbody></table>';
+
+  // Контейнер для формы редактирования
+  html += '<div id="admin-edit-form-container"></div>';
+
+  body.innerHTML = html;
+
+  // Сохраняем данные пользователей для форм редактирования
+  window._adminUsers = users;
+}
+
+function showCreateUserForm() {
+  const container = document.getElementById('admin-create-form-container');
+  container.innerHTML = `
+    <div class="admin-form">
+      <div class="form-title">Создать пользователя</div>
+      <div class="form-row">
+        <div><label>ЛОГИН</label><input id="adm-new-username" placeholder="username"></div>
+        <div><label>ПАРОЛЬ</label><input id="adm-new-password" type="password" placeholder="Пароль"></div>
+      </div>
+      <div class="form-row">
+        <div><label>ОТОБРАЖАЕМОЕ ИМЯ</label><input id="adm-new-display" placeholder="Имя пользователя"></div>
+        <div><label>РОЛЬ</label><select id="adm-new-role"><option value="user">user</option><option value="admin">admin</option></select></div>
+      </div>
+      <div class="form-actions">
+        <button class="pm-cancel" onclick="document.getElementById('admin-create-form-container').innerHTML=''">Отмена</button>
+        <button class="pm-save" onclick="adminCreateUser()">Создать</button>
+      </div>
+    </div>
+  `;
+  setTimeout(() => document.getElementById('adm-new-username').focus(), 100);
+}
+
+async function adminCreateUser() {
+  const username = document.getElementById('adm-new-username').value.trim();
+  const password = document.getElementById('adm-new-password').value;
+  const display_name = document.getElementById('adm-new-display').value.trim();
+  const role = document.getElementById('adm-new-role').value;
+
+  if (!username) { alert('Введите логин'); return; }
+  if (!password || password.length < 3) { alert('Пароль минимум 3 символа'); return; }
+
+  try {
+    const res = await fetch('/admin/users', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ username, password, display_name, role }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.detail || 'Ошибка создания');
+      return;
+    }
+    await openAdminPanel(); // Перезагрузить панель
+  } catch { alert('Ошибка соединения'); }
+}
+
+function showEditUserForm(userId) {
+  const user = (window._adminUsers || []).find(u => u.id === userId);
+  if (!user) return;
+
+  const container = document.getElementById('admin-edit-form-container');
+  container.innerHTML = `
+    <div class="admin-form">
+      <div class="form-title">Редактировать: ${escapeHtml(user.username)}</div>
+      <div class="form-row">
+        <div><label>ОТОБРАЖАЕМОЕ ИМЯ</label><input id="adm-edit-display" value="${escapeHtml(user.display_name)}"></div>
+        <div><label>РОЛЬ</label><select id="adm-edit-role"><option value="user" ${user.role==='user'?'selected':''}>user</option><option value="admin" ${user.role==='admin'?'selected':''}>admin</option></select></div>
+      </div>
+      <div class="form-row">
+        <div><label>НОВЫЙ ПАРОЛЬ (оставьте пустым, чтобы не менять)</label><input id="adm-edit-password" type="password" placeholder="Новый пароль"></div>
+        <div><label>СТАТУС</label><select id="adm-edit-active"><option value="true" ${user.is_active?'selected':''}>Активен</option><option value="false" ${!user.is_active?'selected':''}>Отключён</option></select></div>
+      </div>
+      <div class="form-actions">
+        <button class="pm-cancel" onclick="document.getElementById('admin-edit-form-container').innerHTML=''">Отмена</button>
+        <button class="pm-save" onclick="adminUpdateUser('${userId}')">Сохранить</button>
+      </div>
+    </div>
+  `;
+  container.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function adminUpdateUser(userId) {
+  const display_name = document.getElementById('adm-edit-display').value.trim();
+  const role = document.getElementById('adm-edit-role').value;
+  const password = document.getElementById('adm-edit-password').value;
+  const is_active = document.getElementById('adm-edit-active').value === 'true';
+
+  const payload = { display_name, role, is_active };
+  if (password && password.length >= 3) payload.password = password;
+
+  try {
+    const res = await fetch(`/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const resData = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(resData.detail || 'Ошибка обновления');
+      return;
+    }
+    // Если обновляем себя, обновить currentUser
+    if (userId === currentUser.id) {
+      currentUser.display_name = resData.display_name || currentUser.display_name;
+      currentUser.role = resData.role || currentUser.role;
+      localStorage.setItem('vb_user', JSON.stringify(currentUser));
+      updateUserBadge();
+    }
+    await openAdminPanel();
+  } catch { alert('Ошибка соединения'); }
+}
+
+async function adminDeleteUser(userId, username) {
+  if (!confirm(`Удалить пользователя "${username}"? Все его проекты и сессии будут удалены!`)) return;
+
+  try {
+    const res = await fetch(`/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: {'Authorization':'Bearer '+authToken},
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.detail || 'Ошибка удаления');
+      return;
+    }
+    await openAdminPanel();
+  } catch { alert('Ошибка соединения'); }
 }
 
 init();

@@ -8,6 +8,7 @@ class BoardState(TypedDict):
     project_id: str  # "" if no project
     project_brief: str  # injected into agent prompts
     context_memory: str
+    user_id: str  # ID текущего пользователя
     round1_responses: dict  # {agent_id: text}
     round2_responses: dict  # {agent_id: text}
     synthesis: str

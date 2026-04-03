@@ -113,7 +113,7 @@ async def run_solo(state: BoardState) -> None:
     state["round1_responses"][agent_id] = text
     state["usage"].append(usage)
 
-    # Save session
+    # Сохранить сессию
     session = {
         "id": str(uuid.uuid4()),
         "ts": datetime.now().isoformat(timespec="seconds"),
@@ -121,6 +121,7 @@ async def run_solo(state: BoardState) -> None:
         "question": state["question"],
         "agents": state["agents"],
         "project_id": state.get("project_id", ""),
+        "user_id": state.get("user_id", ""),
         "responses": {agent_id: {"round1": text}},
         "synthesis": "",
     }
@@ -275,6 +276,7 @@ async def run_orchestrator(state: BoardState) -> None:
         "question": state["question"],
         "agents": state["agents"],
         "project_id": state.get("project_id", ""),
+        "user_id": state.get("user_id", ""),
         "responses": responses,
         "synthesis": synthesis,
     }
@@ -350,18 +352,18 @@ async def run_quarterly(state: BoardState) -> None:
     await run_orchestrator(state)
 
 
-async def run_board(question: str, mode: str, agents: list[str], project_id: str = "") -> asyncio.Queue:
-    """Main entry point: creates state and runs the appropriate graph."""
+async def run_board(question: str, mode: str, agents: list[str], project_id: str = "", user_id: str = "") -> asyncio.Queue:
+    """Главная точка входа: создаёт состояние и запускает граф."""
     queue: asyncio.Queue = asyncio.Queue()
 
-    # Load project brief if project selected
+    # Загрузить бриф проекта, если выбран
     project_brief = ""
     if project_id:
         project = await get_project(project_id)
         if project:
             project_brief = project.get("brief", "")
 
-    context_memory = await get_recent_context(3, project_id=project_id or None)
+    context_memory = await get_recent_context(3, project_id=project_id or None, user_id=user_id)
 
     state: BoardState = {
         "question": question,
@@ -370,6 +372,7 @@ async def run_board(question: str, mode: str, agents: list[str], project_id: str
         "project_id": project_id,
         "project_brief": project_brief,
         "context_memory": context_memory,
+        "user_id": user_id,
         "round1_responses": {},
         "round2_responses": {},
         "synthesis": "",
